@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>玉山銀行 - 電商購物中心系統</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f7f6; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h2 { color: #007d4e; border-left: 5px solid #007d4e; padding-left: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #007d4e; color: white; }
+        .admin-section { background: #e8f5e9; padding: 15px; border-radius: 5px; margin-bottom: 30px; }
+        .form-group { margin-bottom: 10px; }
+        input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { cursor: pointer; padding: 8px 15px; border: none; border-radius: 4px; background: #007d4e; color: white; }
+        button:hover { background: #005a38; }
+    </style>
+</head>
+<body>
+<div id="app" class="container">
+    <div class="admin-section">
+        <h2>管理員專區 - 新增商品</h2>
+        <div class="form-group">
+            <input v-model="newP.productId" placeholder="商品編號 (如 P005)">
+            <input v-model="newP.productName" placeholder="商品名稱">
+            <input type="number" v-model="newP.price" placeholder="售價">
+            <input type="number" v-model="newP.quantity" placeholder="初始庫存">
+            <button @click="addProduct">確認新增</button>
+        </div>
+    </div>
+
+    <h2>購物商城</h2>
+    <div class="form-group">
+        <label>會員編號：</label>
+        <input v-model="memberId" style="width: 100px;">
+    </div>
+    <table>
+        <thead>
+        <tr>
+            <th>編號</th><th>名稱</th><th>售價</th><th>庫存</th><th>購買數量</th><th>操作</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr v-for="p in products" :key="p.productId">
+            <td>{{ p.productId }}</td>
+            <td>{{ p.productName }}</td>
+            <td>${{ p.price }}</td>
+            <td>{{ p.quantity }}</td>
+            <td><input type="number" v-model="p.buyQty" min="1" :max="p.quantity" style="width: 60px;"></td>
+            <td><button @click="buy(p)">立即購買</button></td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+        const { createApp } = Vue;
+        createApp({
+            data() {
+                return {
+                    products: [],
+                    memberId: '458', // 預設會員編號
+                    newP: { productId: '', productName: '', price: null, quantity: null }
+                }
+            },
+            mounted() { this.loadProducts(); },
+            methods: {
+                loadProducts() {
+                    axios.get('/api/products').then(res => {
+                        this.products = res.data.map(p => ({ ...p, buyQty: 1 }));
+                    }).catch(err => console.error("抓取失敗", err));
+                },
+                addProduct() {
+                    if(!this.newP.productId || !this.newP.productName) return alert("請填寫完整資訊");
+                    axios.post('/api/products', this.newP).then(res => {
+                        alert("商品新增成功！");
+                        this.newP = { productId: '', productName: '', price: null, quantity: null }; // 清空表單
+                        this.loadProducts(); // 重新整理列表
+                    }).catch(err => alert("新增失敗"));
+                },
+                buy(p) {
+                    if (p.buyQty > p.quantity) return alert("庫存不足！");
+                    axios.post('/api/orders', {
+                        memberId: this.memberId,
+                        productId: p.productId,
+                        qty: p.buyQty
+                    }).then(res => {
+                        alert(res.data); // 顯示「訂單建立成功」
+                        this.loadProducts(); // 更新庫存顯示
+                    }).catch(err => {
+                        // 處理後端拋出的 RuntimeException (如庫存不足)
+                        alert(err.response.data);
+                    });
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
